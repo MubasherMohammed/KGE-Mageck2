@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.vscode/
+.idea/
+
+# TeX Live tree (created/symlinked at install time, ~2 GB)
+texlive2026/
+texlive2026

@@ -1,0 +1,70 @@
+# Installation Guide — MAGeCK2 (KGE, UMI), env `mageckenv2`
+
+One command per machine. No Anaconda account, no module system. The installer
+is **idempotent** — safe to re-run; it never re-downloads/recompiles what
+already exists. `install_arrhenius.sh` and `install_mac.sh` are entry points
+that exec the single core installer `install_mageck2.sh`. Details: see `README`;
+this file is the quick path.
+
+## 1) Arrhenius HPC
+
+```bash
+cd /nobackup/proj/disk/crispr-fun/shared/Conda_setup_Mageck2
+sbatch install_arrhenius.sh            # SLURM job; log: kge2-install-<jobid>.out
+# or interactively on the login node:
+bash   install_arrhenius.sh            # custom name: bash install_arrhenius.sh myenv
+```
+
+## 2) Local Mac (Apple Silicon or Intel) / local Linux
+
+```bash
+# one-time: copy the folder over (skip the Linux TeX tree symlink)
+rsync -av --exclude texlive2026 \
+  mubasher@<arrhenius>:/nobackup/proj/disk/crispr-fun/shared/Conda_setup_Mageck2/ ~/Conda_setup_Mageck2/
+
+cd ~/Conda_setup_Mageck2
+bash install_mac.sh                    # custom name: bash install_mac.sh myenv
+```
+
+First Mac run also installs Miniconda (if no conda found; inits bash + zsh)
+and TeX Live (~2 GB, into `~/texlive2026`). If Miniconda was just installed,
+open a **new terminal** before activating.
+
+## 3) Check it worked / use it
+
+The verification section at the end must show the version and a working PDF
+toolchain, e.g.:
+
+```
+MAGeCK2 version:   ...
+RRA: present (compiled C++ helper)
+mageckGSEA: present (compiled C++ helper)
+R:                 R version 4.x
+pdflatex:          pdflatex 3.14... (on activated PATH)
+```
+
+```bash
+conda activate mageckenv2
+
+# UMI count (R1 = guide, R2 = 10 bp UMI):
+mageck2 count -l library.csv -n demo \
+    --fastq  S1_R1 S2_R1 S3_R1 ... \
+    --fastq-2 S1_R2 S2_R2 S3_R2 ... \
+    --sample-label ctrl,treat1,treat2 \
+    --umi secondpair --umi-start-2 0 --umi-end-2 10 --pdf-report --html-report
+
+mageck2 test -k demo.count.txt -n demo -t treat1,treat2 -c ctrl \
+    --norm-method none --pdf-report --html-report
+```
+
+## 4) If something goes wrong
+
+| Symptom | Fix |
+|---|---|
+| `cp: illegal option -- -` (Mac) | Stale script copy — re-copy the `install_*.sh` files from the shared folder |
+| `pip install of mageck2 failed` (step 3) | Network to GitHub, or the env's C/C++ toolchain; see `/tmp/kge2_pip.log`; retry, or `KGE2_FORCE_PIP=1 bash <installer>` |
+| `mageck2: OK` but old code | Overlay is re-applied on every run; force the pip step with `KGE2_FORCE_PIP=1` |
+| `TeX Live: FAILED` / no `pdflatex` | Re-run the installer (or `bash install_texlive2026.sh`); on Mac: check CTAN network, `xcode-select --install` if Perl is missing |
+| Broken / half-built env | `KGE2_FORCE_RECREATE=1 bash <installer>` (fresh rebuild) |
+| Want HTML reports only (skip 2 GB TeX) | `KGE2_SKIP_TEXLIVE=1 bash <installer>` |
+| Env created in an unexpected place | It follows conda's native `envs_dirs` for that shell; set `ENV_PREFIX=/dir` to force a location |

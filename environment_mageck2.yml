@@ -1,0 +1,61 @@
+# MAGeCK2 (KGE) environment — portable core.
+#
+# CROSS-PLATFORM spec (linux-64 / linux-aarch64 / osx-64 / osx-arm64). Channels
+# are conda-forge + bioconda only (no `defaults`, no `bih-cubi`).
+#
+# mageck2 itself is deliberately NOT in this file: install_mageck2.sh adds it
+# from git via pip  (pip install git+https://github.com/davidliwei/mageck2.git).
+# mageck2's setup.py compiles two bundled C++ helpers (RRA, mageckGSEA) at
+# install time by running `make`, so this env ships a C/C++ compiler
+# (c-compiler/cxx-compiler -> gcc/g++ on Linux, clang/clang++ on macOS) + make
+# + git (used by the `git+` pip install).
+#
+# The KGE HTML-report + UMI-figure overlay (./mageck2/) is applied by the
+# installer AFTER the pip install, adding a `--html-report` flag and a UMI
+# count figure to the reports.
+
+name: mageckenv2
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - python=3.11
+  # C/C++ toolchain: mageck2's setup.py runs `make` on the rra/ + gsea/ C++
+  # sources; git is needed for the `pip install git+...` step.
+  - make
+  - c-compiler
+  - cxx-compiler
+  - git
+  # mageck2 runtime deps (kept on conda-forge so pip reuses them rather than
+  # re-downloading from PyPI).
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - statsmodels
+  - seaborn
+  - adjusttext
+  - ipykernel
+  - decoupler-py
+  # R packages required by the PDF report templates (the PDFs are knit from
+  # the .Rnw templates via Rscript, NOT from the .Rmd files — so only these
+  # four are needed; the Rmd files' extra deps (fgsea, pheatmap, tidyr,
+  # reshape2, stringr) are unused by mageck2's PDF pipeline, and r-fgsea is
+  # not published on conda-forge/bioconda anyway). All noarch on conda-forge,
+  # so they install on every platform.
+  #   fastq_template.Rnw   -> gplots, ggplot2, xtable
+  #   plot_template.Rnw    -> xtable
+  #   (Sweave/knitr engine -> knitr)
+  - r-base
+  - r-knitr
+  - r-ggplot2
+  - r-gplots
+  - r-xtable
+  # texi2dvi (R's tools::texi2dvi needs it on PATH for the Sweave -> pdf step).
+  - texinfo
+  - pip
+  - pip:
+    - plotly>=6.0
+    - pydeseq2>=0.5

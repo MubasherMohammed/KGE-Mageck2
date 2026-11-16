@@ -1,0 +1,122 @@
+# MAGeCK2 (KGE) Setup — `Conda_setup_Mageck2`
+
+> **Quick install:** see `INSTALL` — one command per platform (Arrhenius / Mac / Linux).
+
+A portable, one-command installer for **MAGeCK2** (UMI-aware CRISPR screen
+analysis) plus the KGE HTML-report extension with an added **UMI count figure**.
+
+It is the UMI-aware sibling of [`../Conda_setup`](../Conda_setup) (original
+MAGeCK). Both install into **separate conda environments**, so they can coexist:
+
+| Setup | Env | Tool | Source |
+|---|---|---|---|
+| `Conda_setup` | `mageckenv` | `mageck` (0.5.9.5) | bioconda + KGE overlay |
+| `Conda_setup_Mageck2` | `mageckenv2` | `mageck2` (git) | `pip install git+…/mageck2.git` + KGE overlay |
+
+## What it does
+
+One command creates a working `mageckenv2` on **any** machine (Arrhenius HPC
+and local Linux/macOS) with **no module-system requirement**:
+
+```bash
+# Arrhenius HPC:
+sbatch install_arrhenius.sh        # SLURM job (cd into this folder first)
+bash   install_arrhenius.sh        # login node / interactive
+
+# Local Mac / Linux (copy the folder over first, excluding texlive2026):
+bash   install_mac.sh              # one go: env + mageck2 + overlay + TeX Live
+
+# install_mageck2.sh is the actual installer both wrappers exec (all steps and
+# env overrides live there — one source of truth, no duplicated logic); it can
+# also be run directly:
+bash   install_mageck2.sh [env_name]
+```
+
+The installer:
+
+1. **Locates conda** — conda on `PATH` → local Miniconda/Miniforge/Mambaforge/
+   Micromamba → (best-effort) Lmod module → downloads a platform-matched
+   Miniconda into `$HOME/miniconda3` (shell init for bash + zsh).
+2. **Creates the env** — Python 3.11, R + LaTeX, matplotlib/plotly, and a
+   C/C++ compiler + `make` + `git` (mageck2 compiles two bundled C++ helpers,
+   `RRA` and `mageckGSEA`, at install time).
+3. **Installs MAGeCK2 from git** — `pip install git+https://github.com/davidliwei/mageck2.git@fb2f9083`
+    (pinned commit: the overlay below was built against it; compiled with the
+    env's `make` + `c++`).
+4. **Overlays the KGE diff** (`./mageck2/`, 6 files) — adds a `--html-report`
+    flag to `count`/`test`, the HTML report generator (same layout as the
+    original `mageckenv`) with a **UMI count figure**, and the patched PDF
+    table templates.
+5. **Ensures TeX Live** for `--pdf-report` — on Linux/HPC reuses the shared
+   `texlive2026/` tree; on macOS installs into `$HOME/texlive2026` instead
+   (a Linux-built tree copied from the HPC is rejected, not reused).
+6. **Verifies** — MAGeCK2 import, `RRA`/`mageckGSEA` binaries, HTML report, R,
+   `pdflatex`.
+
+## UMI-aware counting
+
+MAGeCK2 counts **unique molecules** (deduplicated on the UMI), not raw reads.
+For a paired design where **R1 = guide** and **R2 = UMI** (the common 10 bp UMI
+layout), specify the UMI window in the second read explicitly:
+
+```bash
+conda activate mageckenv2
+
+# count (R1 = guide, R2 = 10 bp UMI) — writes demo.count.txt, demo.umi_count.txt, ...
+mageck2 count -l library.csv -n demo \
+    --fastq  S1_R1 S2_R1 S3_R1 ... \
+    --fastq-2 S1_R2 S2_R2 S3_R2 ... \
+    --sample-label ctrl,treat1,treat2 \
+    --umi secondpair --umi-start-2 0 --umi-end-2 10 --pdf-report --html-report
+
+# test (from the count table) — writes demo.pdf + demo.report.html
+mageck2 test -k demo.count.txt -n demo \
+    -t treat1,treat2 -c ctrl --norm-method none --pdf-report --html-report
+```
+
+### Reports
+- **PDF** (native mageck2): `demo_countsummary.pdf` (count), `demo_summary.pdf`
+  (test) — via the bundled Rnw/Rmd templates (Sweave/knitr → `pdflatex`).
+- **HTML** (KGE overlay): `demo.report.html` — same layout as the original
+  `mageckenv`, **plus a UMI count figure** (per-sample unique-molecule counts,
+  from `demo.umi_count.txt`, alongside raw reads so the dedup effect is visible).
+
+**Caveat — `--umi auto` on Cas12a screens:** `auto` searches the first read
+before the second and can lock onto the `TTTV` PAM immediately downstream of
+the guide instead of the real UMI in R2 (the PAM+1bp window looks "variable" to
+the search). For the OVCAR4 Cas12a Lib456 data this was verified: `auto`
+tagged PAM variants (31 distinct 5-mers per sgRNA) while R2 holds the true
+UMI (hundreds–thousands of distinct 10-mers, UMI-tagged reads exactly matching
+raw counts). Always sanity-check `demo.umi_count.txt`: distinct UMIs per
+sgRNA should be large, and the per-sample UMI read sum should equal the raw
+count.
+
+## Environment overrides
+| Variable | Default | Meaning |
+|---|---|---|
+| `$1` / `ENV_NAME` | `mageckenv2` | environment name |
+| `ENV_PREFIX` | *(empty)* | if set, envs→`$ENV_PREFIX/conda_envs`, pkgs→`$ENV_PREFIX/conda_pkgs`; empty = conda's native location (portable default) |
+| `MAGECK2_GIT_URL` | `…/mageck2.git@fb2f9083eef2…` | mageck2 git URL (pinned; override at your own risk) |
+| `TEXLIVE_DIR` | `$HOME/texlive2026` (macOS) / `<script dir>/texlive2026` (Linux) | TeX Live root (Linux default = symlinked shared tree) |
+| `KGE2_FORCE_RECREATE=1` | — | remove & recreate the env (batch-safe) |
+| `KGE2_FORCE_PIP=1` | — | force re-running `pip install git+mageck2` |
+| `KGE2_SKIP_TEXLIVE=1` | — | skip TeX Live (no PDF reports) |
+
+## Files
+- `INSTALL` — brief installation guide (one command per platform + troubleshooting).
+- `install_mageck2.sh` — the portable one-shot installer (all the logic).
+- `install_arrhenius.sh` — Arrhenius entry point (SBATCH header; thin wrapper
+  that execs `install_mageck2.sh`).
+- `install_mac.sh` — local Mac/Linux entry point (thin wrapper that execs
+  `install_mageck2.sh`).
+- `environment_mageck2.yml` — cross-platform core env (no mageck2; that's pip).
+- `mageck2/` — KGE diff overlay (8 files, copied over the pip-installed package):
+  `htmlReport.py` (HTML report + UMI figure), `argsParser.py` (`--html-report`),
+  `mageckCount.py` + `crisprFunction.py` (report triggers),
+  `testVisual.py` + `testVisualCount.py` (PDF-report robustness: missing-Rscript
+  detection, Sweave→knitr fallback, loud PDF verification), and the patched
+  `fastq_template.Rnw` + `plot_template.Rnw` (PDF table rendering).
+- `install_texlive2026.sh` — idempotent TeX Live helper.
+- `texlive2026/` — symlink to the shared TeX Live 2026 tree (Linux/HPC only;
+  macOS installs its own tree in `$HOME/texlive2026` — when copying this
+  folder to a Mac, exclude `texlive2026` to save the transfer).
