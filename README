@@ -43,7 +43,7 @@ The installer:
 3. **Installs MAGeCK2 from git** — `pip install git+https://github.com/davidliwei/mageck2.git@fb2f9083`
     (pinned commit: the overlay below was built against it; compiled with the
     env's `make` + `c++`).
-4. **Overlays the KGE diff** (`./mageck2/`, 6 files) — adds a `--html-report`
+4. **Overlays the KGE diff** (`./mageck2/`, 8 files) — adds a `--html-report`
     flag to `count`/`test`, the HTML report generator (same layout as the
     original `mageckenv`) with a **UMI count figure**, and the patched PDF
     table templates.
@@ -63,7 +63,9 @@ layout), specify the UMI window in the second read explicitly:
 conda activate mageckenv2
 
 # count (R1 = guide, R2 = 10 bp UMI) — writes demo.count.txt, demo.umi_count.txt, ...
-mageck2 count -l library.csv -n demo \
+# (library delimiter: comma for .csv files, TAB for any other extension —
+#  a tab-delimited library named .csv silently loads zero sgRNAs)
+mageck2 count -l library.txt -n demo \
     --fastq  S1_R1 S2_R1 S3_R1 ... \
     --fastq-2 S1_R2 S2_R2 S3_R2 ... \
     --sample-label ctrl,treat1,treat2 \
